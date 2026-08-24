@@ -1,0 +1,13 @@
+seller_id,name,territory,tiers,capacity,status
+S01,Alex Rivera,US-East,Strategic|Enterprise,30.0,active
+S02,Priya Shah,US-East,Mid-Market,40.0,active
+S03,Marcus Lee,US-West,Strategic,20.0,active
+S04,Jordan Kim,US-West,Enterprise,30.0,active
+S05,Sam Chen,US-West,Mid-Market,45.0,active
+S06,Diego Morales,US-Central,Enterprise|Mid-Market,35.0,active
+S07,Rachel Park,US-Central,Strategic,18.0,OOO
+S08,Tom O'Brien,EMEA,Strategic|Enterprise,25.0,active
+S09,Lena Vogt,EMEA,Mid-Market,40.0,active
+S10,Hiro Tanaka,APAC,Strategic|Enterprise|Mid-Market,50.0,active
+S11,Anika Reddy,APAC,,0.0,ramp
+S12,Chris Walsh,US-East,Strategic,22.0,active
