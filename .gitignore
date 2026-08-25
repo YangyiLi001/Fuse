@@ -10,3 +10,7 @@ __pycache__/
 NOTES.md
 fuse-design.html
 loom-script.md
+
+# 录屏原件，不入库
+*.mov
+*.mp4

@@ -15,10 +15,6 @@ python3 -m signal_router --data-dir data --out output
 python3 tests/test_pipeline.py              # conservation + behaviour checks
 ```
 
-Optional: `--llm` polishes the suggested openers through the Fireworks chat
-API (`export FIREWORKS_API_KEY=...`). Any failure falls back silently to the
-deterministic templates, so the flag is always safe.
-
 ## Inputs
 
 `data/accounts.csv`, `data/signals.csv`, `data/sellers.csv` — as provided
@@ -44,20 +40,8 @@ The `Assign` tab lists everything with no owner — unmatched signals plus any a
 the router could not place — and lets a manager drag each card onto a seller (or pick
 one from the card's dropdown). Choices persist in that browser via `localStorage`, so
 they survive a reload but are **not** shared with anyone else and are invisible to the
-pipeline. **Export assignments** turns the board into CSV and copies it to the
-clipboard:
+pipeline.
 
-```csv
-item_type,item_id,item_name,region,assigned_seller_id,assigned_seller_name,territory,region_match
-signal,SIG049,Urchin Secure,APAC,S10,Hiro Tanaka,APAC,yes
-```
-
-`region_match` flags a card dropped outside the seller's own territory — allowed,
-since a manager may deliberately cover a gap, but recorded so the choice is
-reviewable.
-
-Save that as `data/manual_assignments.csv` to hand the decisions back to the next run.
-Reading it during routing is the obvious next step and is not wired up yet.
 
 ## Where the knobs are
 
