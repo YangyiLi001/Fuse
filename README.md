@@ -1,6 +1,6 @@
 # Fuse — signal-to-seller routing
 
-Takes 50 raw GTM signals, scores them from their payloads, bundles them per
+Takes raw GTM signals, scores them from their payloads, bundles them per
 account, and routes each bundle to the right seller — with an auditable score
 ledger and a human-review queue for everything that can't be routed safely.
 
@@ -12,7 +12,7 @@ No dependencies and no virtualenv — Python 3.10+ standard library only. Use
 ```bash
 python3 -m signal_router                    # reads data/, writes output/
 python3 -m signal_router --data-dir data --out output
-python3 tests/test_pipeline.py              # 13 checks, ~0.2s
+python3 tests/test_pipeline.py              # conservation + behaviour checks
 ```
 
 Optional: `--llm` polishes the suggested openers through the Fireworks chat
@@ -26,12 +26,15 @@ deterministic templates, so the flag is always safe.
 
 ## Outputs (`output/`)
 
+A sample run is committed so the results can be read without running anything;
+re-running overwrites it in place.
+
 | File | Audience | What it is |
 |---|---|---|
 | `queues/S0X_<name>.md` | each seller | their accounts, sorted by priority, with why-now facts, a score ledger, and a suggested opener |
 | `dashboard.html` | sellers / managers | single static page, four tabs: team overview, seller queues, unmatched queue, and an **Assign** board for triaging what the router could not place |
 | `routes.csv` | RevOps | flat audit table: every routed signal with score breakdown and routing reason |
-| `unmatched_queue.csv` | SDR / RevOps | 15 signals that match no CRM account, with recommended actions and fuzzy hints |
+| `unmatched_queue.csv` | SDR / RevOps | every signal that matches no CRM account, with a recommended action and close-name suggestions — never an assignment |
 | `coverage_report.md` | RevOps | territory holes, single points of failure, post-routing load, data-quality flags |
 | `scoring_audit.md` | reviewer | flat audit table: every signal's payload → score components → owner, grouped by type; bundle → seller with the aggregation math |
 
@@ -45,9 +48,13 @@ pipeline. **Export assignments** turns the board into CSV and copies it to the
 clipboard:
 
 ```csv
-item_type,item_id,item_name,region,assigned_seller_id,assigned_seller_name
-signal,SIG049,Urchin Secure,APAC,S10,Hiro Tanaka
+item_type,item_id,item_name,region,assigned_seller_id,assigned_seller_name,territory,region_match
+signal,SIG049,Urchin Secure,APAC,S10,Hiro Tanaka,APAC,yes
 ```
+
+`region_match` flags a card dropped outside the seller's own territory — allowed,
+since a manager may deliberately cover a gap, but recorded so the choice is
+reviewable.
 
 Save that as `data/manual_assignments.csv` to hand the decisions back to the next run.
 Reading it during routing is the obvious next step and is not wired up yet.

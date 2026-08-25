@@ -9,3 +9,4 @@ __pycache__/
 .claude/settings.local.json
 NOTES.md
 fuse-design.html
+loom-script.md

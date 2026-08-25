@@ -9,11 +9,26 @@ opportunities" reading would behave differently. It weights the tie-break only
 and never caps anyone: nothing here refuses an assignment because a seller is
 full, which is why the load column can run past capacity without complaint.
 Fallbacks (each recorded in routing_reason): adjacent tier in the same
-territory, then same tier across US regions, then the unassigned queue.
+territory, then same tier in a neighbouring region of the same market,
+then the unassigned queue.
 OOO and ramping sellers never receive routes; the gaps they create are
 reported in coverage_report.md instead.
 """
-from .config import ADJACENT_TIERS, TIER_FROM_ARR, US_REGIONS
+from .config import ADJACENT_TIERS, TIER_FROM_ARR
+
+
+def _market(region: str) -> str:
+    """The market a region belongs to, read off its own name.
+
+    US-East, US-West and US-Central share the "US" prefix and are treated as one
+    market: same language, overlapping hours, one contract regime, so a rep in one
+    can hold an account in another until proper coverage returns. EMEA and APAC
+    carry no prefix and therefore form markets of one — deliberately, because
+    handing an APAC account to a US rep produces coverage on paper and nothing on
+    the phone. Deriving this from the name rather than hard-coding a list of
+    regions means a later EU-North / EU-South split groups itself.
+    """
+    return region.split("-")[0]
 
 
 def _pick(candidates: list[dict], load: dict) -> dict | None:
@@ -50,8 +65,11 @@ def route_bundles(bundles: list[dict], sellers: list[dict]) -> dict:
                               f"fell back to {alt} tier in-territory")
                     break
 
-        if not seller and region in US_REGIONS:  # fallback 2: cross US region
-            other = [s for r in US_REGIONS if r != region for s in in_cell(r, tier)]
+        if not seller:  # fallback 2: same tier, neighbouring region, same market
+            other = [s for s in active
+                     if s["territory"] != region
+                     and _market(s["territory"]) == _market(region)
+                     and tier in s["tiers"]]
             seller = _pick(other, load)
             if seller:
                 reason = (f"{region} / {tier}: no in-territory coverage — "

@@ -5,10 +5,24 @@ Signals arrive daily against accounts and
 sellers, and nothing decides who acts on what. **This is a prototype that takes raw signals,
 scores them, and routes each to the right seller.**
 
+Stripped to its shape, the task is two hops — attach each event to a company, then
+attach that company to a person:
+
+```
+  ┌───────────────┐        ┌────────────────────┐        ┌────────────────┐
+  │    signals    │  ──▶   │      account       │  ──▶   │     seller     │
+  └───────────────┘        └────────────────────┘        └────────────────┘
+    what happened            who it happened to            who acts on it
+```
+
+Neither hop is given. The signal often does not name an account, and the account
+file and the seller file describe the world in different vocabularies. This is
+how the prototype closes both:
+
 ```
  usage_spike      ╮                                                               ╭─▶ seller
  job_change       │  ┌──────────┐    ┌───────┐    ┌──────────┐    ┌───────────┐   │
- intent_topic     ├─▶│ resolve  │ ─▶ │ score │ ─▶ │  bundle  │ ─▶ │   route   │───┼─▶ seller
+ intent_topic     ├─▶│ resolve  │ ─▶ │scoring│ ─▶ │  bundle  │ ─▶ │   routing │───┼─▶ seller
  funding_event    │  └──────────┘    └───────┘    └──────────┘    └───────────┘   │
  competitor_eval  ╯   to account      payload      by account      region+tier    ╰─▶ seller
                            │                                            │
@@ -22,16 +36,6 @@ scores them, and routes each to the right seller.**
 Each seller ends the run with one ranked queue — P1 to act on today, P2 this
 week, P3 to watch — and every item in it carries a named owner.
 
-
-
-## Principles
-
-1. **Every number is a business judgment** — all of them in `config.py`, with the
-   reasoning beside them.
-2. **Rank and explain together.** A number nobody can audit is a number nobody
-   trusts, and a seller who distrusts the queue stops opening it.
-3. **Refuse rather than guess.** Wrong-company outreach costs more than a delay.
-4. **Sellers think in accounts**, so signals bundle per account.
 
 ## Scoring
 
@@ -81,10 +85,7 @@ visible rather than absorbed.
 3. **Load follows territory, not effort.** The router balances inside a cell but
    cannot balance across them. This run three active reps covered the region that
    produced one work item while one rep absorbed ten, and the account base does not
-   explain it — 41 accounts against 64. At this sample size an empty queue is
-   ordinary noise; persisting at daily volume it is a territory-design problem no
-   router can fix. The dashboard therefore marks who received nothing and leaves
-   the judgment to a person.
+   explain it
 4. **Ambiguous semantics.** `job_change.direction` never says what it is relative
    to. We read "departed" as a real departure because the cheaper failure is a
    wasted check, not congratulating someone who has left — it inverts 7 of 11 job
@@ -100,27 +101,20 @@ outcomes could replace my judgment instead of sitting behind it.
 
 ## Future extensions
 
-1. Put an identity service ahead of resolution and raise the billing↔CRM break as its own
-alert. Or Integrate with CRM or Slack that can create accounts directly.
-2. Adding manager level authority to manually redirect signals to seller that could be flexible enough to redirect when sellers are in Ramp or OOO status. 
-3. Persist state for the unassigned signals. A real store is what unlocks the rest:
-today each run is a standalone set of files, so there is no history to dedupe
-against, no capacity that binds over time, and no record of what happened to an
-item after it was routed.
-4. Give every seller a named backup, so an OOO or ramping territory is covered by a
-person instead of falling through to an adjacent tier, and hand the accounts back
-when they return.
-5. Write the openers with a live model. They are deterministic templates today; the
-`--llm` path calls Fireworks' own inference API and falls back to the template on
-any failure, but it ships off by default and has never run against the live
-endpoint. 
-6. Give the seller the account, not just the signal — what the company does, who it
-sells to, what it announced this month. A rep opening a P1 on a prospect they have
-never heard of currently has one payload fact and nothing else.
-7. Make the view dynamic. The dashboard is a static file regenerated per run, which
-is why the Assign board can only export CSV rather than write a decision back. A
-served app with a session behind it would close that loop and let filters, claims
-and dismissals persist.
+Solid is what runs today. Dashed is what could happen for next.
+
+```
+                       ┌─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐    ┌─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
+                       │ enrich & auto-create │    │  account brief   │
+                       └─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘    └─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
+                                   ▼                         ▼
+  ┌─────────────┐        ┌──────────────────┐        ┌──────────────┐
+  │   signals   │  ──▶   │     account      │  ──▶   │    seller    │
+  └─────────────┘        └──────────────────┘        └──────────────┘
+         ▲                                                   │
+         └─ ─ ─ ─ ─ ─ ─ ─  outcome captured ─ ─ ─ ─ ─ ─ ─ ─ ─┘
+```
+
 
 ## AI usage
 
@@ -129,18 +123,17 @@ unroutable signals, the `severity_hint` contradictions, the vocabulary mismatch 
 the coverage holes were all found and verified before any code — and at writing the
 pipeline and tests once the shape was settled.
 
-**The idea and shape was mine.** I set the stage boundaries and the rule that resolution
-refuses rather than guesses, and I chose the additive-ledger scoring form over the
-model's first proposal, a three-factor multiplication that buried the ranking
-levers inside normalization constants. Deciding what the output had to be drove
-most of the product: a **team overview** so a manager sees the day's P1 set, who
-owns each item and where load actually sits; per-seller queues beneath it; and —
-because a queue that quietly drops work is worse than no queue — an **Assign
-board** where every unmatched or unassigned signal is dragged onto a named seller
-and exported as CSV, so a human decision leaves the browser instead of dying in it.
-Region is on every card there because it is the only routing dimension those
-signals still have. I also cut the model's per-card "why this was routed to you"
-note: sellers don't need the rationale, so it lives in `routes.csv` for RevOps.
-Data audit and corrections were mine as well. Keep iterating with AI to refine the prototype. 
+**The shape and the judgment calls were mine.** I set the stage boundaries and the
+rule that resolution refuses rather than guesses.  And I set the rule
+that decides where writing belongs: the dashboard shows state, this document carries
+interpretation — a paragraph the model had added to the dashboard, editorialising
+about this run's sample size, came back out.
 
-
+**Deciding what the output had to be drove most of the product.** A team overview so
+a manager sees the day's P1 set, who owns each item and where load actually sits;
+per-seller queues beneath it; and — because a queue that quietly drops work is worse
+than no queue — an Assign board where every unmatched or unassigned signal is
+dragged onto a named seller and exported as CSV, so a human decision leaves the
+browser instead of dying in it. **The defects surfaced when I questioned the output, not when the model checked its
+own work.** is why the worked example now traces every number back to the table it came
+from, rather than presenting the answer and asking to be believed.

@@ -191,6 +191,22 @@ class TestPipeline(unittest.TestCase):
             config.ASSUMPTIONS.clear(); config.ASSUMPTIONS.update(saved[1])
             score_signals(self.signals)
 
+    def test_cross_region_fallback_stays_inside_one_market(self):
+        """A rep may cover a neighbouring region only within the same market.
+
+        The market comes from the region name's prefix, so US-East/West/Central
+        group and EMEA/APAC stand alone. Guarding it because the branch never
+        fires on the sample data — an untested path carrying an assumption.
+        """
+        from signal_router.route import _market
+        self.assertEqual(_market("US-East"), _market("US-Central"))
+        self.assertNotEqual(_market("EMEA"), _market("APAC"))
+        self.assertNotEqual(_market("EMEA"), _market("US-East"))
+        for b in self.bundles:
+            if b["seller"] and "cross-region" in b["routing_reason"]:
+                self.assertEqual(_market(b["seller"]["territory"]),
+                                 _market(b["account"]["region"]))
+
     def test_deterministic_output(self):
         import tempfile
         outs = []

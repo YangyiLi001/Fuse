@@ -34,13 +34,12 @@ TIER_FROM_ARR = {
 }
 
 # When the exact (territory, tier) cell has no active seller, fall back to an
-# adjacent tier in the same territory before crossing US regions.
+# adjacent tier in the same territory before crossing to a neighbouring region.
 ADJACENT_TIERS = {
     "Strategic": ["Enterprise"],
     "Enterprise": ["Strategic", "Mid-Market"],
     "Mid-Market": ["Enterprise"],
 }
-US_REGIONS = ["US-East", "US-West", "US-Central"]
 
 # ---------------------------------------------------------------------------
 # Scoring: score = (base + intensity_pts + fit_pts) * recency_decay
