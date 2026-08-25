@@ -1,20 +1,27 @@
 # DESIGN — Fuse (signal-to-seller routing)
 
-## Principles
-Signals arrive daily — usage spikes, job changes, intent
-topics, funding rounds, competitor evaluations — against accounts and
-sellers, and nothing decides who acts on what.
+## Background 
+Signals arrive daily against accounts and
+sellers, and nothing decides who acts on what. **This is a prototype that takes raw signals,
+scores them, and routes each to the right seller.**
 
 ```
-signals.csv ──▶  resolve   ──▶  score  ──▶   bundle   ──▶ route   ──▶     queues/
-                exact only     payload     by account     region         per seller
-                               points                     + tier
-                    │                                       │                │
-                    │ no exact match                        │                │
-                    ▼                                       ▼                ▼
-              human review                             unassigned     manually assign
-                unmatched
+ usage_spike      ╮                                                               ╭─▶ seller
+ job_change       │  ┌──────────┐    ┌───────┐    ┌──────────┐    ┌───────────┐   │
+ intent_topic     ├─▶│ resolve  │ ─▶ │ score │ ─▶ │  bundle  │ ─▶ │   route   │───┼─▶ seller
+ funding_event    │  └──────────┘    └───────┘    └──────────┘    └───────────┘   │
+ competitor_eval  ╯   to account      payload      by account      region+tier    ╰─▶ seller
+                           │                                            │
+                           │ no account match                           │ no eligible seller
+                           ▼                                            ▼
+                      human review                                  unassigned
+                           │                                            │
+                           ╰─────▶Assign board — a person places it ◀───╯
 ```
+
+Each seller ends the run with one ranked queue — P1 to act on today, P2 this
+week, P3 to watch — and every item in it carries a named owner.
+
 
 
 ## Principles
@@ -32,29 +39,15 @@ signals.csv ──▶  resolve   ──▶  score  ──▶   bundle   ──�
 result reads as a ledger; recency multiplies so a stale signal cannot ride a high
 base to the top.
 
-**base** is an actionability prior — usage 40 > competitor 35 > funding 30 > job
-change 25 > intent 20 — so "real usage beats third-party intent" is stated, not
-buried in a normalizer. 
-**intensity** (0–30) reads the payload and nothing else.
-**fit** (0–17) is mostly the `(is_customer, signal_type)` matrix, because that pair
-decides *which play this is* — `churn risk` (+12), `displacement` (+8), `expansion`
-(+10) — and the play's name is what the seller sees.
-**recency** uses per-type
-half-lives of 14d to 45d: what decays is the *action window*, not the fact.
+**base** What kind of signal is this? Some kinds are worth attention before you even read them.
+**intensity** (0–30) How strong is this particular one? A traffic spike of 354% is not a spike of 78%.
+**fit** (0–17) What does it mean for this account? The same event reads differently for a customer than for a prospect.
+**recency** Is there still time? Not "how old is the fact" but "how much of the window to act on it is left".
 
-One signal end to end, as `scoring_audit.md` prints it:
+One signal end to end, with every number traced back to the table it came from
+(`scoring_audit.md` prints the same trace in text):
 
-```
-SIG043  Solace Build (A251) · EMEA · $50M–$250M · prospect · AI-Native
-        {"competitor":"Anyscale","action":"comparison_search","days_since_last_signal":19}
-
-  base       competitor_evaluation                      35.0
-  intensity  1.00 action × 0.68 freshness × 30          20.5
-  fit        displacement 8 + ARR 2 + AI-Native 2       12.0
-                                           subtotal     67.5
-  recency    1.1 days old, 14-day half-life           ×0.9477
-                                              score     64.0   → P1, Tom O'Brien
-```
+![SIG043 scored, every number traced to its source](docs/scoring-trace.png)
 
  `severity_hint` gets **zero weight** — it contradicts
 its own payloads ($200M round tagged `low`, +354% spike `low`, 0.54 intent `high`).
@@ -69,18 +62,7 @@ Territory is the account's region. Tier comes from ARR band because `segment_hin
 (Strategic / Enterprise / Mid-Market) — **the biggest assumption here**.
 
 
-```
-account (region, ARR band)
- │  tier = f(ARR band)
- ▼
- active seller in (region, tier)?  ──yes──▶  assign · lowest load ÷ capacity
- │ no
- adjacent tier, same territory?    ──yes──▶  assign · reason names the fallback 
- │ no
- same tier, another US region?     ──yes──▶  assign · reason names the crossing 
- │ no
- unassigned ──────────────────────────────▶  coverage_report.md                  
-```
+![The routing ladder: first rung with a person on it wins, and the rung is recorded](docs/routing-ladder.png)
 
 Capacity is taken to be a count of accounts — one work item is one unit whatever
 its size or signal count — and it weights the tie-break rather than capping
@@ -147,7 +129,7 @@ unroutable signals, the `severity_hint` contradictions, the vocabulary mismatch 
 the coverage holes were all found and verified before any code — and at writing the
 pipeline and tests once the shape was settled.
 
-**The iadea and shape was mine.** I set the stage boundaries and the rule that resolution
+**The idea and shape was mine.** I set the stage boundaries and the rule that resolution
 refuses rather than guesses, and I chose the additive-ledger scoring form over the
 model's first proposal, a three-factor multiplication that buried the ranking
 levers inside normalization constants. Deciding what the output had to be drove
