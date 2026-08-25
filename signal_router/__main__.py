@@ -1,4 +1,4 @@
-"""Entry point: python -m signal_router [--data-dir data] [--out output] [--llm]"""
+"""Entry point: python3 -m signal_router [--data-dir data] [--out output] [--llm]"""
 import argparse
 from collections import Counter
 

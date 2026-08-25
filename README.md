@@ -6,12 +6,13 @@ ledger and a human-review queue for everything that can't be routed safely.
 
 ## Run
 
-No dependencies — Python 3.10+ standard library only.
+No dependencies and no virtualenv — Python 3.10+ standard library only. Use
+`python3`; on macOS and most Linux distributions there is no bare `python`.
 
 ```bash
-python -m signal_router                    # reads data/, writes output/
-python -m signal_router --data-dir data --out output
-python tests/test_pipeline.py              # 9 checks, ~0.2s
+python3 -m signal_router                    # reads data/, writes output/
+python3 -m signal_router --data-dir data --out output
+python3 tests/test_pipeline.py              # 13 checks, ~0.2s
 ```
 
 Optional: `--llm` polishes the suggested openers through the Fireworks chat

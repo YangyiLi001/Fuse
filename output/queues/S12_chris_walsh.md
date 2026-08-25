@@ -2,7 +2,7 @@
 _US-East · Strategic · 1 accounts, sorted by priority_
 
 ## [P3] Grove Grid — 43.6
-Telecom · $250M+ ARR · prospect · US-East
+prospect · Telecom · $250M+ ARR · US-East
 
 - **funding_event** (SIG038): Series C $60M
   - score: 30 base + 12.0 intensity + 10 fit → ×0.8379 recency (7.7d old) = 43.6

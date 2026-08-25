@@ -4,8 +4,9 @@ score = (base_type + intensity_pts + fit_pts) * recency_decay
 
 The additive part prints as a ledger anyone can audit; recency is a
 multiplicative gate so a stale signal can't ride a high base to the top.
-severity_hint is ignored (weight 0): it contradicts the payloads in this
-dataset (see DESIGN.md).
+severity_hint carries weight only if ASSUMPTIONS["SEVERITY_HINT_WEIGHT"] is
+raised above 0; it defaults to 0 because it does not track its own payloads
+(see DESIGN.md).
 """
 import math
 from datetime import datetime, timezone
@@ -105,10 +106,12 @@ def score_signals(signals: list[dict]) -> None:
         # arithmetic 0.1 off the stated score — which is the fastest way to lose
         # trust in a number whose whole job is to be checkable.
         intensity = round(SCORING["intensity_max_pts"] * frac, 1)
+        severity = round(ASSUMPTIONS["SEVERITY_HINT_WEIGHT"]
+                         * SCORING["severity_pts"].get(sig["severity_hint"], 0), 1)
         recency = round(0.5 ** (max(age_days, 0) / half_life), 4)
-        sig["score"] = round((base + intensity + fit) * recency, 1)
+        sig["score"] = round((base + intensity + fit + severity) * recency, 1)
         sig["score_parts"] = {
-            "base": base, "intensity": intensity, "fit": fit,
+            "base": base, "intensity": intensity, "fit": fit, "severity": severity,
             "recency": recency, "age_days": round(age_days, 1),
         }
         sig["why_now"] = why

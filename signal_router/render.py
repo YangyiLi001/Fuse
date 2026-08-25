@@ -9,7 +9,8 @@ from .config import SCORING, TIER_FROM_ARR
 
 def _ledger(sig: dict) -> str:
     p = sig["score_parts"]
-    return (f"{p['base']} base + {p['intensity']} intensity + {p['fit']} fit "
+    sev = f" + {p['severity']} severity" if p["severity"] else ""
+    return (f"{p['base']} base + {p['intensity']} intensity + {p['fit']} fit{sev} "
             f"→ ×{p['recency']} recency ({p['age_days']}d old) = {sig['score']}")
 
 
@@ -76,9 +77,9 @@ def write_seller_queues(bundles: list[dict], sellers: list[dict], out: Path) -> 
                  f"{len(blist)} accounts, sorted by priority_", ""]
         for b in blist:
             a = b["account"]
-            status = "customer" if a["is_customer"] else "prospect"
+            status = "**CUSTOMER**" if a["is_customer"] else "prospect"
             lines.append(f"## [{b['priority']}] {a['account_name']} — {b['score']}")
-            lines.append(f"{a['industry']} · {a['arr_band']} ARR · {status} · {a['region']}")
+            lines.append(f"{status} · {a['industry']} · {a['arr_band']} ARR · {a['region']}")
             lines.append("")
             for sig in b["signals"]:
                 lines.append(f"- **{sig['signal_type']}** ({sig['signal_id']}): "
@@ -118,6 +119,11 @@ def coverage_report(bundles, unmatched, sellers, routing_meta, out: Path) -> Non
         n = load[s["seller_id"]]
         lines.append(f"- {s['seller_id']} {s['name']}: {n} accounts "
                      f"(capacity {s['capacity']:.0f})")
+    note = load_balance_note(load_findings(bundles, sellers, routing_meta))
+    if note:
+        lines.append("")
+        lines.append("### Uneven load")
+        lines.append(note)
     if routing_meta["unassigned_notes"]:
         lines.append("")
         lines.append("## Unassigned")
@@ -140,6 +146,68 @@ def coverage_report(bundles, unmatched, sellers, routing_meta, out: Path) -> Non
     lines.append("- severity_hint is ignored by scoring: it contradicts payloads "
                  "(e.g. $200M round tagged 'low', +354% usage spike tagged 'low')")
     (out / "coverage_report.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def load_findings(bundles, sellers, routing_meta) -> dict:
+    """Who received nothing, and whether that is a routing gap or a demand gap.
+
+    A seller with an empty queue is only a routing problem if work existed in
+    their (territory, tier) cell and went elsewhere. Far more often the cell was
+    simply empty, which is a question about territory design or signal volume —
+    a different conversation, and one a team lead should be handed directly.
+    """
+    active = [s for s in sellers if s["status"] == "active" and s["capacity"] > 0]
+    cell_work: dict[tuple, int] = {}
+    for b in bundles:
+        key = (b["account"]["region"], b["tier"])
+        cell_work[key] = cell_work.get(key, 0) + 1
+
+    idle = []
+    for s in active:
+        if routing_meta["load"][s["seller_id"]]:
+            continue
+        available = sum(n for (r, t), n in cell_work.items()
+                        if r == s["territory"] and t in s["tiers"])
+        idle.append({"seller": s, "work_in_cell": available})
+
+    by_region = {}
+    for r in sorted({s["territory"] for s in active}):
+        reps = [s for s in active if s["territory"] == r]
+        items = sum(1 for b in bundles if b["account"]["region"] == r)
+        by_region[r] = {"items": items, "reps": len(reps),
+                        "per_rep": items / len(reps)}
+    ranked = sorted(by_region.items(), key=lambda kv: kv[1]["per_rep"])
+    return {"idle": idle, "by_region": by_region,
+            "thinnest": ranked[0] if ranked else None,
+            "heaviest": ranked[-1] if ranked else None}
+
+
+def load_balance_note(f: dict) -> str:
+    """Factual read of an uneven run, or '' when nobody was left empty-handed.
+
+    Deliberately states only what happened; whether an empty queue is sampling
+    noise or a territory-design problem depends on volume over time, which one
+    run cannot answer and this tool should not assert."""
+    if not f["idle"]:
+        return ""
+    names = ", ".join(f"{i['seller']['name']} ({i['seller']['seller_id']})"
+                      for i in f["idle"])
+    stranded = [i for i in f["idle"] if i["work_in_cell"]]
+    parts = [f"{len(f['idle'])} seller{'s' if len(f['idle']) != 1 else ''} received "
+             f"nothing this run: {names}."]
+    if stranded:
+        parts.append("Work existed in their territory and tier and went elsewhere — "
+                     "that is a routing gap worth reading the reasons in routes.csv for.")
+    else:
+        parts.append("None was skipped: their territory and tier produced no work at "
+                     "all, so the imbalance sits upstream of routing.")
+    thin, heavy = f["thinnest"], f["heaviest"]
+    if thin and heavy and thin[0] != heavy[0]:
+        parts.append(f"{thin[0]} fielded {thin[1]['reps']} active rep"
+                     f"{'s' if thin[1]['reps'] != 1 else ''} for {thin[1]['items']} "
+                     f"item{'s' if thin[1]['items'] != 1 else ''} while {heavy[0]} "
+                     f"fielded {heavy[1]['reps']} for {heavy[1]['items']}.")
+    return " ".join(parts)
 
 
 def _coverage_flags(sellers: list[dict]) -> list[str]:
@@ -250,6 +318,7 @@ _CSS = """
   --bg:#f7f5fc; --card:#fff; --ink:#1d1730; --mut:#6d6684; --line:#e7e2f3;
   --brand:#6d28d9; --brand-ink:#4c1d95; --brand-soft:#f4efff; --brand-line:#d8caf6;
   --p1:#c2255c; --p2:#a8690c; --p3:#7a7391; --fix:#a04000;
+  --cust-ink:#0b6b62; --cust-bg:#e2f5f2; --cust-line:#a7ddd6;
 }
 *{box-sizing:border-box;margin:0}
 body{font:14px/1.45 -apple-system,'Segoe UI',sans-serif;background:var(--bg);
@@ -284,6 +353,11 @@ h3{font-size:14px}
   white-space:nowrap}
 .P1{background:var(--p1)}.P2{background:var(--p2)}.P3{background:var(--p3)}
 .FIX{background:var(--fix)}
+.rel{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  border-radius:4px;padding:1px 7px;white-space:nowrap;border:1px solid}
+.rel.cust{color:var(--cust-ink);background:var(--cust-bg);border-color:var(--cust-line)}
+.rel.prosp{color:var(--mut);background:transparent;border-color:var(--line);
+  font-weight:600}
 .play{font-size:11px;font-weight:600;color:var(--brand-ink);background:var(--brand-soft);
   border:1px solid var(--brand-line);border-radius:4px;padding:1px 6px;white-space:nowrap}
 .frow{display:flex;gap:10px;align-items:baseline;background:var(--card);
@@ -295,6 +369,14 @@ table{border-collapse:collapse;background:var(--card);width:100%;font-size:12.5p
 td,th{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
 th{background:var(--brand-soft);color:var(--brand-ink)}
 .wrap{overflow-x:auto;border-radius:8px}
+tr.idle td{background:var(--bg)}
+tr.idle td:first-child{box-shadow:inset 3px 0 0 var(--fix)}
+tr.excluded td{background:var(--bg);color:var(--mut)}
+tr.excluded td:first-child{box-shadow:inset 3px 0 0 var(--line)}
+.chip-state{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--mut);border:1px solid currentColor;
+  border-radius:3px;padding:0 5px;margin-left:7px;vertical-align:1px}
+tr.idle .chip-state{color:var(--fix)}
 .num{text-align:right}
 ul.flags{margin:0 0 0 18px;font-size:13px}
 ul.flags li{margin-bottom:4px}
@@ -467,18 +549,25 @@ document.addEventListener('DOMContentLoaded', function(){
 """
 
 
+def _rel_chip(is_customer: bool) -> str:
+    """Customer vs prospect decides how a seller opens the conversation, so it
+    reads as a badge rather than the last word of a grey facts line."""
+    return ('<span class="rel cust">customer</span>' if is_customer
+            else '<span class="rel prosp">prospect</span>')
+
+
 def _bundle_card(b: dict) -> str:
     a = b["account"]
-    status = "customer" if a["is_customer"] else "prospect"
     plays = sorted({s["play"] for s in b["signals"] if s["play"]})
     parts = [
         f"<div class=card><div class=row1>"
         f"<span class='badge {b['priority']}'>{b['priority']}</span>"
         f"<b>{html.escape(a['account_name'])}</b>"
+        + _rel_chip(a["is_customer"])
         + "".join(f"<span class=play>{html.escape(p)}</span>" for p in plays)
         + f"<span class=score>{b['score']}</span></div>"
         f"<div class=facts>{html.escape(a['industry'])} · {a['arr_band']} · "
-        f"{status}</div>"]
+        f"{a['region']}</div>"]
     for sig in b["signals"]:
         warn = (" <span class=warn>⚠ verify match</span>"
                 if sig["match_confidence"] == "medium" else "")
@@ -518,7 +607,8 @@ def _assign_items(bundles, unmatched) -> list[dict]:
     return items
 
 
-def write_dashboard(bundles, unmatched, sellers, out: Path) -> None:
+def write_dashboard(bundles, unmatched, sellers, routing_meta, out: Path) -> None:
+    findings = load_findings(bundles, sellers, routing_meta)
     n_sig = sum(len(b["signals"]) for b in bundles)
     by_prio = {"P1": [], "P2": [], "P3": []}
     for b in bundles:
@@ -585,7 +675,8 @@ def write_dashboard(bundles, unmatched, sellers, out: Path) -> None:
             play = (f"<span class=play>{html.escape(top['play'])}</span>"
                     if top["play"] else "")
             p.append(f"<div class=frow><span class='badge {band}'>{band}</span>"
-                     f"<b>{html.escape(a['account_name'])}</b>{play}"
+                     f"<b>{html.escape(a['account_name'])}</b>"
+                     f"{_rel_chip(a['is_customer'])}{play}"
                      f"<span class=facts>{b['score']}</span>"
                      f"<span class=who>{who}</span>"
                      f"<span class=fact>{top['signal_type']}: "
@@ -598,33 +689,33 @@ def write_dashboard(bundles, unmatched, sellers, out: Path) -> None:
     p.append("<tr><th>Seller</th><th>Territory · tiers</th><th class=num>P1</th>"
              "<th class=num>P2</th><th class=num>P3</th><th class=num>Total</th>"
              "<th class=num>Capacity</th></tr>")
-    for s in routable:
+    # Every seller appears, including those the router cannot use — an absent
+    # name reads as "no such rep" rather than "unavailable this run".
+    for s in sellers:
         blist = by_seller.get(s["seller_id"], [])
         cnt = {"P1": 0, "P2": 0, "P3": 0}
         for b in blist:
             cnt[b["priority"]] += 1
-        p.append(f"<tr><td>{html.escape(s['name'])} ({s['seller_id']})</td>"
-                 f"<td>{s['territory']} · {'/'.join(s['tiers'])}</td>"
+        eligible = s["status"] == "active" and s["capacity"] > 0
+        if not eligible:
+            state, cls = s["status"], " class=excluded"
+        elif not blist:
+            state, cls = "idle", " class=idle"
+        else:
+            state, cls = "", ""
+        chip = f"<span class=chip-state>{html.escape(state)}</span>" if state else ""
+        p.append(f"<tr{cls}>"
+                 f"<td>{html.escape(s['name'])} ({s['seller_id']}){chip}</td>"
+                 f"<td>{s['territory']} · {'/'.join(s['tiers']) or '—'}</td>"
                  f"<td class=num>{cnt['P1'] or ''}</td>"
                  f"<td class=num>{cnt['P2'] or ''}</td>"
                  f"<td class=num>{cnt['P3'] or ''}</td>"
-                 f"<td class=num><b>{len(blist)}</b></td>"
+                 f"<td class=num><b>{len(blist) if eligible else '—'}</b></td>"
                  f"<td class=num>{s['capacity']:.0f}</td></tr>")
     p.append("</table></div>")
 
-    p.append("<h2>Coverage flags</h2><ul class=flags>")
-    for s in sellers:
-        if s["status"] != "active" or s["capacity"] <= 0:
-            p.append(f"<li>{s['seller_id']} {html.escape(s['name'])} excluded "
-                     f"from routing ({s['status']}, capacity {s['capacity']:.0f})</li>")
-    for f in _coverage_flags(sellers):
-        p.append(f"<li>{html.escape(f)}</li>")
-    n_usage = sum(1 for s in unmatched if s["signal_type"] == "usage_spike")
-    if n_usage:
-        p.append(f"<li><b>All {n_usage} usage-spike signals are unroutable</b> — "
-                 f"payloads say is_customer=true but the companies are missing "
-                 f"from the CRM (see Unmatched tab)</li>")
-    p.append("</ul></div>")
+
+    p.append("</div>")
 
     # ---- page 2: seller queues (collapsed by default) --------------------
     p.append("<div class=page id=sellers>")
@@ -749,4 +840,4 @@ def render_all(bundles, unmatched, sellers, routing_meta, out_dir: str) -> None:
     write_seller_queues(bundles, sellers, out)
     coverage_report(bundles, unmatched, sellers, routing_meta, out)
     write_scoring_audit(bundles, unmatched, out)
-    write_dashboard(bundles, unmatched, sellers, out)
+    write_dashboard(bundles, unmatched, sellers, routing_meta, out)

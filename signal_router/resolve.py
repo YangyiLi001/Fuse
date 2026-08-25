@@ -2,8 +2,8 @@
 
 Match chain is exact-only: account_id -> domain -> account_name. We never
 fuzzy-assign — routing an outreach to the wrong company costs more than
-letting a human resolve it. Fuzzy candidates are attached to unmatched
-signals as *suggestions* for the review queue.
+letting a human resolve it. Close names ride along as *suggestions* for the
+review queue and are never acted on automatically.
 """
 import difflib
 
@@ -50,7 +50,10 @@ def resolve(signals: list[dict], accounts: list[dict]) -> None:
                 sig["match_confidence"] = "high"
             continue
 
-        # Unmatched: collect human-review hints only.
+        # No exact match: collect close names as hints for whoever reviews this,
+        # never as an assignment. On this dataset every one of them points at a
+        # different company (Pulse Grid to Jute Grid, Yew Cloud to Elm Cloud),
+        # which is exactly why they stay suggestions.
         cand = difflib.get_close_matches(
             name, by_name.keys(), n=2, cutoff=FUZZY_SUGGEST_CUTOFF)
         sig["fuzzy_suggestions"] = [

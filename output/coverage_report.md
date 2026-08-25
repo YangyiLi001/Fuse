@@ -21,6 +21,9 @@
 - S10 Hiro Tanaka: 5 accounts (capacity 50)
 - S12 Chris Walsh: 1 accounts (capacity 22)
 
+### Uneven load
+2 sellers received nothing this run: Marcus Lee (S03), Sam Chen (S05). None was skipped: their territory and tier produced no work at all, so the imbalance sits upstream of routing. US-West fielded 3 active reps for 1 item while US-Central fielded 1 for 10.
+
 ## Data-quality flags
 - 15 of 50 signals could not be matched to any account (see unmatched_queue.csv)
 - **All 4 usage_spike signals are unmatched despite payloads claiming is_customer=true** — billing↔CRM linkage is broken; this hides the highest-value signals from sellers

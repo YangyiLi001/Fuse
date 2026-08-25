@@ -123,8 +123,73 @@ class TestPipeline(unittest.TestCase):
         # arithmetic from the printed components and land on the printed score.
         for sig in self.signals:
             p = sig["score_parts"]
-            redone = round((p["base"] + p["intensity"] + p["fit"]) * p["recency"], 1)
+            redone = round((p["base"] + p["intensity"] + p["fit"]
+                            + p["severity"]) * p["recency"], 1)
             self.assertEqual(redone, sig["score"], sig["signal_id"])
+
+    def test_severity_hint_knob_is_live(self):
+        # config.py is only an assumption log if its knobs actually move the
+        # output. This one sat unread for a while; the test exists so it can't
+        # go dead again.
+        from signal_router import config
+        sig = next(s for s in self.signals if s["severity_hint"] == "high")
+        before = sig["score"]
+        config.ASSUMPTIONS["SEVERITY_HINT_WEIGHT"] = 1.0
+        try:
+            score_signals(self.signals)
+            self.assertGreater(sig["score"], before)
+        finally:
+            config.ASSUMPTIONS["SEVERITY_HINT_WEIGHT"] = 0.0
+            score_signals(self.signals)
+        self.assertEqual(sig["score"], before)
+
+    def test_config_knobs_are_all_live(self):
+        """Every knob must actually move the output.
+
+`SEVERITY_HINT_WEIGHT` sat in config.py unread at one point, which
+        makes the file a wish-list rather than the assumption log it claims to
+        be. Perturb each knob and require the output to change.
+        """
+        from signal_router import config
+        import copy
+
+        def fingerprint():
+            accounts, signals, _ = load_all(ROOT / "data")
+            resolve(signals, accounts)
+            score_signals(signals)
+            return tuple((s["score"], s["match_method"]) for s in signals)
+
+        base = fingerprint()
+        saved = copy.deepcopy(config.SCORING), copy.deepcopy(config.ASSUMPTIONS)
+        knobs = [
+            (config.SCORING["base"], "funding_event", 90),
+            (config.SCORING["funding"], "amount_full_score_musd", 20),
+            (config.SCORING["usage"], "pct_full_score", 50),
+            (config.SCORING["usage"], "log10_req_full_score", 2.0),
+            (config.SCORING["usage"], "pct_weight", 0.1),
+            (config.SCORING["intent"], "icp_topic_boost", 3.0),
+            (config.SCORING["competitor"], "days_scale", 5),
+            (config.SCORING["competitor"], "freshness_floor", 0.95),
+            (config.SCORING["competitor"]["action_weight"], "docs_read", 0.01),
+            (config.SCORING["job_change"]["seniority_weight"], "cto", 0.01),
+            (config.SCORING["job_change"], "departed_prospect_factor", 0.99),
+            (config.SCORING["fit"], "ai_native_pts", 40),
+            (config.SCORING, "intensity_max_pts", 90),
+            (config.SCORING["half_life_days"], "funding_event", 1),
+            (config.ASSUMPTIONS, "SEVERITY_HINT_WEIGHT", 1.0),
+            (config.ASSUMPTIONS, "DEPARTED_MEANS_LEFT_ACCOUNT", False),
+        ]
+        try:
+            for node, key, value in knobs:
+                original = node[key]
+                node[key] = value
+                changed = fingerprint() != base
+                node[key] = original
+                self.assertTrue(changed, f"{key} is a dead knob")
+        finally:
+            config.SCORING.clear(); config.SCORING.update(saved[0])
+            config.ASSUMPTIONS.clear(); config.ASSUMPTIONS.update(saved[1])
+            score_signals(self.signals)
 
     def test_deterministic_output(self):
         import tempfile

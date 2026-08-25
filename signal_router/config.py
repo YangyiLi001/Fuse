@@ -14,13 +14,12 @@ ASSUMPTIONS = {
     # customers, dead contact on prospects). Flip to False to read "departed
     # previous_company and joined this account" (opportunity, same as arrived).
     "DEPARTED_MEANS_LEFT_ACCOUNT": True,
-    # severity_hint contradicts the payloads (a $200M Series A tagged "low",
-    # a +354% usage spike tagged "low"), so it gets zero weight.
+    # severity_hint does not track its own payloads. Across all 50 signals the
+    # rank correlation with payload-derived intensity is -0.29 — mildly the wrong
+    # way round — and no signal type shows a meaningful positive one. It is
+    # therefore given zero weight rather than trusted. Raise this to 1.0 to score
+    # it at full strength (see SEVERITY_HINT_PTS); anything between scales it.
     "SEVERITY_HINT_WEIGHT": 0.0,
-    # Signals that can't be exactly matched to an account go to a human-review
-    # queue. We never fuzzy-assign ("queue" | "fuzzy" is intentionally NOT
-    # implemented — wrong-account outreach is worse than delayed outreach).
-    "UNMATCHED_POLICY": "queue",
 }
 
 # accounts.csv segment_hint (AI-Native / Enterprise-Expansion) shares no
@@ -134,6 +133,8 @@ SCORING = {
     # Multi-signal accounts: best signal counts fully, the rest add evidence.
     "bundle": {"second_weight": 0.30, "third_weight": 0.15,
                "competitor_plus_intent_bonus": 5},
+    # Points contributed by severity_hint at SEVERITY_HINT_WEIGHT = 1.0.
+    "severity_pts": {"low": 0, "medium": 5, "high": 10},
     # Priority bands are percentile cuts, not fixed scores: P1 is the top 20%
     # of a run, P2 the next 30%. Absolute thresholds had to be re-tuned every
     # time a weight moved, which made the bands meaningless as a unit. A cut is

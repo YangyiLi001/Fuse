@@ -2,7 +2,7 @@
 _EMEA · Mid-Market · 3 accounts, sorted by priority_
 
 ## [P1] Pioneer Health — 67.3
-AI/ML · <$1M ARR · prospect · EMEA
+prospect · AI/ML · <$1M ARR · EMEA
 
 - **job_change** (SIG002): Jordan Kim joined as Director of ML Platform
   - score: 25 base + 30.0 intensity + 3 fit → ×0.9374 recency (4.2d old) = 54.4
@@ -12,7 +12,7 @@ AI/ML · <$1M ARR · prospect · EMEA
 > **Opener:** Welcome Jordan Kim as Director of ML Platform! New platform leaders usually revisit the inference stack in their first 90 days — can I get 20 minutes on the calendar?
 
 ## [P3] Dolomite Systems — 46.0
-HR Tech · $1M-$10M ARR · prospect · EMEA
+prospect · HR Tech · $1M-$10M ARR · EMEA
 
 - **intent_topic** (SIG028): topic 'GPU alternatives' at 0.94 via G2 (ICP topic)
   - score: 20 base + 30.0 intensity + 1 fit → ×0.9018 recency (3.1d old) = 46.0
@@ -20,7 +20,7 @@ HR Tech · $1M-$10M ARR · prospect · EMEA
 > **Opener:** Saw Dolomite Systems researching GPU alternatives — we've helped similar teams on exactly that. Can I share benchmarks relevant to your workload?
 
 ## [P3] Hollow Labs — 38.5
-Logistics · <$1M ARR · customer · EMEA
+**CUSTOMER** · Logistics · <$1M ARR · EMEA
 
 - **funding_event** (SIG016): Series B $40M
   - score: 30 base + 8.0 intensity + 8 fit → ×0.8379 recency (7.7d old) = 38.5

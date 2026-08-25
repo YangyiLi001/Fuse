@@ -1,6 +1,13 @@
 """Route each account bundle to a seller.
 
 Chain: territory + tier -> active sellers -> load-balanced pick.
+
+Capacity is read as a count of accounts: one account work item consumes one unit
+however many signals it carries and however large the account is. sellers.csv
+never states the unit, so this is an interpretation — a "per week" or "open
+opportunities" reading would behave differently. It weights the tie-break only
+and never caps anyone: nothing here refuses an assignment because a seller is
+full, which is why the load column can run past capacity without complaint.
 Fallbacks (each recorded in routing_reason): adjacent tier in the same
 territory, then same tier across US regions, then the unassigned queue.
 OOO and ramping sellers never receive routes; the gaps they create are
