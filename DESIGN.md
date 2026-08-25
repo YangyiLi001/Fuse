@@ -61,9 +61,12 @@ whenever a weight moved. They rank today's available work, not absolute urgency.
 
 ## Routing
 
-Territory is the account's region. Tier comes from ARR band because `segment_hint`
-(AI-Native / Enterprise-Expansion) shares no vocabulary with seller tiers
-(Strategic / Enterprise / Mid-Market) — **the biggest assumption here**.
+An account has a **place** and a **size**; a seller covers one place and some
+sizes; the router matches them. Place needs no translation — `accounts.csv` calls
+the column `region` and `sellers.csv` calls it `territory`, but the five values are
+identical. Size is where they disagree: an account states a revenue band
+(`$50M-$250M`), a seller states a label (`Enterprise`), and nothing in the data
+connects the two. Mapping band to label is **the biggest assumption here**.
 
 
 ![The routing ladder: first rung with a person on it wins, and the rung is recorded](docs/routing-ladder.png)
