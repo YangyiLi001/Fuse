@@ -118,6 +118,14 @@ class TestPipeline(unittest.TestCase):
                 key = (sig["account"]["is_customer"], sig["signal_type"])
                 self.assertIn(key, matrix, f"{key} falls through to 0")
 
+    def test_every_printed_ledger_closes(self):
+        # The ledger is the trust mechanism: a reader must be able to re-do the
+        # arithmetic from the printed components and land on the printed score.
+        for sig in self.signals:
+            p = sig["score_parts"]
+            redone = round((p["base"] + p["intensity"] + p["fit"]) * p["recency"], 1)
+            self.assertEqual(redone, sig["score"], sig["signal_id"])
+
     def test_deterministic_output(self):
         import tempfile
         outs = []

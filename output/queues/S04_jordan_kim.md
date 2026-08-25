@@ -5,6 +5,6 @@ _US-West · Enterprise · 1 accounts, sorted by priority_
 Cybersecurity · $50M-$250M ARR · prospect · US-West
 
 - **job_change** (SIG041): Jordan Kim departed — contact gone
-  - score: 25 base + 10.8 intensity + 5 fit → ×0.99 recency (0.9d old) = 40.2
+  - score: 25 base + 10.8 intensity + 5 fit → ×0.9865 recency (0.9d old) = 40.2
 
 > **Opener:** Jordan Kim has left — worth finding the new owner of the AI-infrastructure decision before re-engaging.

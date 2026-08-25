@@ -96,15 +96,20 @@ def score_signals(signals: list[dict]) -> None:
     for sig in signals:
         base = SCORING["base"][sig["signal_type"]]
         frac, why = _intensity_frac(sig)
-        intensity = SCORING["intensity_max_pts"] * frac
         fit, play = _fit_pts(sig)
         age_days = (anchor - _event_time(sig)).total_seconds() / 86400
         half_life = SCORING["half_life_days"][sig["signal_type"]]
-        recency = 0.5 ** (max(age_days, 0) / half_life)
+        # Round the components first, then score from the rounded values, so the
+        # printed ledger reproduces the printed total exactly. Scoring from full
+        # precision and rounding only for display leaves a reader who re-does the
+        # arithmetic 0.1 off the stated score — which is the fastest way to lose
+        # trust in a number whose whole job is to be checkable.
+        intensity = round(SCORING["intensity_max_pts"] * frac, 1)
+        recency = round(0.5 ** (max(age_days, 0) / half_life), 4)
         sig["score"] = round((base + intensity + fit) * recency, 1)
         sig["score_parts"] = {
-            "base": base, "intensity": round(intensity, 1), "fit": fit,
-            "recency": round(recency, 2), "age_days": round(age_days, 1),
+            "base": base, "intensity": intensity, "fit": fit,
+            "recency": recency, "age_days": round(age_days, 1),
         }
         sig["why_now"] = why
         sig["play"] = play
